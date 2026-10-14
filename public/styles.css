@@ -25,7 +25,8 @@ button { color: inherit; }
 button:not(:disabled) { cursor: pointer; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 
-.crt { position: fixed; inset: 0; z-index: 100; pointer-events: none; opacity: .28; background: repeating-linear-gradient(0deg, rgba(0,0,0,.27) 0, rgba(0,0,0,.27) 1px, transparent 1px, transparent 3px), radial-gradient(ellipse, transparent 62%, rgba(0,0,0,.7)); mix-blend-mode: multiply; }
+.crt { position: fixed; inset: 0; z-index: 100; pointer-events: none; opacity: .06; background: repeating-linear-gradient(0deg, rgba(0,0,0,.15) 0, rgba(0,0,0,.15) 1px, transparent 1px, transparent 4px); mix-blend-mode: multiply; }
+body.game-locked .crt { display: none !important; }
 .topbar { position: sticky; top: 0; z-index: 50; min-height: 78px; padding: 0 max(22px, env(safe-area-inset-left)); display: flex; align-items: center; gap: 26px; background: rgba(16, 15, 24, .94); box-shadow: 0 5px 26px #000; backdrop-filter: blur(16px); }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; text-align: left; flex: 0 0 auto; }
 .brand__lamp { width: 13px; height: 13px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 15px var(--cyan); animation: lamp 1.7s infinite; }

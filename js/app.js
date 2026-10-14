@@ -394,7 +394,7 @@
   function generateLocalObstacles(seed, stage, startDist, endDist, startIndex) {
     startIndex = startIndex || 0;
     var obstacles = [];
-    var dist = startDist + 38;
+    var dist = startDist + (stage === 1 ? 75 : 45);
     var index = startIndex;
     var lastZapDist = startDist;
     var groundKinds = ["cabinet", "cone", "cable", "spikes", "barrel"];
@@ -518,7 +518,8 @@
           }
 
           var needRender = false;
-          for (var oi = (pl.lastObsIndex || -1) + 1; oi < g.obstacles.length; oi += 1) {
+          var startOi = typeof pl.lastObsIndex === "number" && pl.lastObsIndex >= 0 ? pl.lastObsIndex + 1 : 0;
+          for (var oi = startOi; oi < g.obstacles.length; oi += 1) {
             var ob = g.obstacles[oi];
             if (ob.distance > g.distance) break;
             pl.lastObsIndex = oi;
@@ -556,6 +557,7 @@
                 pl.alive = false;
                 g.status = "finished";
                 g.winnerId = null;
+                break;
               }
             }
           }
