@@ -366,12 +366,12 @@ body.game-locked .dino-arena { flex: 1; min-height: 0; height: 100%; max-height:
 .race-strip::after { content: ""; position: absolute; left: 0; right: 0; bottom: 23px; height: 3px; background: currentColor; opacity: .55; box-shadow: 0 0 8px currentColor; }
 .city-silhouette { position: absolute; inset: 18px 0 26px; opacity: .7; background: repeating-linear-gradient(90deg,#08091a 0 35px,#111134 35px 58px,#08091a 58px 73px); clip-path: polygon(0 30%,5% 30%,5% 3%,12% 3%,12% 45%,20% 45%,20% 14%,28% 14%,28% 52%,37% 52%,37% 0,44% 0,44% 35%,53% 35%,53% 10%,64% 10%,64% 44%,75% 44%,75% 4%,84% 4%,84% 30%,92% 30%,92% 16%,100% 16%,100% 100%,0 100%); }
 .road-lines { position: absolute; left: 0; right: 0; bottom: 12px; height: 4px; opacity: .55; background: repeating-linear-gradient(90deg,transparent 0 25px,var(--yellow) 25px 42px); }
-.race-strip .pixel-dino { position: absolute; z-index: 5; left: 10%; bottom: 24px; transform: scale(.7); transform-origin: bottom left; animation: dino-run .22s steps(2) infinite; transition: bottom .06s ease-out, transform .06s ease-out; }.dino-lane.is-self .race-strip .pixel-dino { transform: scale(.9); }
+.race-strip .pixel-dino { position: absolute; z-index: 5; left: 10%; bottom: 24px; transform: scale(.7); transform-origin: bottom left; animation: dino-run .22s steps(2) infinite; transition: bottom .08s ease-out, transform .08s ease-out; }.dino-lane.is-self .race-strip .pixel-dino { transform: scale(.9); }
 .runner-state { position: absolute; z-index: 5; left: 10%; top: 7px; color: white; font: 900 9px Consolas,monospace; }
 .race-strip:has(.state-jump) .pixel-dino, .dino-lane.is-jumping .pixel-dino { bottom: 66px; animation: none; transform: scale(.7) rotate(-7deg); }
 .dino-lane.is-self .race-strip:has(.state-jump) .pixel-dino, .dino-lane.is-self.is-jumping .pixel-dino { bottom: 76px; animation: none; transform: scale(.9) rotate(-7deg); }
-.race-strip:has(.state-duck) .pixel-dino, .dino-lane.is-ducking .pixel-dino { height: 38px; bottom: 18px; transform: scale(.7, .48); }
-.dino-lane.is-self .race-strip:has(.state-duck) .pixel-dino, .dino-lane.is-self.is-ducking .pixel-dino { height: 38px; bottom: 18px; transform: scale(.9,.55); }
+.race-strip:has(.state-duck) .pixel-dino, .dino-lane.is-ducking .pixel-dino { height: 38px; bottom: 24px; transform: scale(.7, .48); }
+.dino-lane.is-self .race-strip:has(.state-duck) .pixel-dino, .dino-lane.is-self.is-ducking .pixel-dino { height: 38px; bottom: 24px; transform: scale(.9,.55); }
 .dino-obstacle { position: absolute; z-index: 6; pointer-events: none; user-select: none; will-change: left; display: inline-flex; align-items: flex-end; justify-content: center; }
 .obs-art { display: block; overflow: visible; filter: drop-shadow(0 0 7px currentColor); }
 .obstacle-ground { bottom: 24px; top: auto; height: 34px; }

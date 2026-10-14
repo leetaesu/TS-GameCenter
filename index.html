@@ -61,7 +61,7 @@
         <button class="modal-close" type="button" data-action="close-server-modal" aria-label="닫기">✕</button>
         <span class="server-modal__tag">ONLINE MULTIPLAYER</span>
         <h2 id="serverModalTitle">🌐 온라인 게임 서버 연결</h2>
-        <p>전 세계 친구들과 온라인으로 함께 플레이하려면 WebSocket 게임 서버 주소가 필요합니다.</p>
+        <p>기본은 서버 없이 방장 브라우저끼리 연결(P2P)합니다. 방장이 나가도 방이 유지되는 전용 서버를 쓰려면 WebSocket 서버 주소를 입력하세요. (선택 사항)</p>
         <div class="server-status-card">
           <span class="server-status-indicator" id="modalServerIndicator">●</span>
           <div>
@@ -92,6 +92,11 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <footer class="footer"><div class="ticker"><span>● LIVE STATUS</span><span>전 세계 어디서든 친구들과 실시간 대전</span><span>★ TS 게임센터 네온 ON</span><span>ONLINE MULTIPLAYER</span></div><div><strong>TS 게임센터 (1994)</strong><p>골목길 가로등 아래, 동전 튕기는 소리가 가득한 레트로 오락실</p><small>© TS ARCADE. ONLINE &amp; LOCAL PLAY.</small></div></footer>
   <script src="./js/qr.js"></script>
+  <script src="./js/vendor/peerjs.min.js"></script>
+  <script src="./js/game.js"></script>
+  <script src="./js/dino-game.js"></script>
+  <script src="./js/room-engine.js"></script>
+  <script src="./js/p2p.js"></script>
   <script src="./js/app.js"></script>
 </body>
 </html>

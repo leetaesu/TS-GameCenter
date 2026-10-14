@@ -79,7 +79,7 @@
       if (type === "dino-jump") {
         if (pl.action === "jump" && now < pl.actionUntil) return true;
         pl.action = "jump";
-        pl.actionUntil = now + 480;
+        pl.actionUntil = now + 300;
         tone("jump");
         renderDinoGame();
       } else if (type === "dino-duck") {
@@ -132,13 +132,11 @@
     var saved = localStorage.getItem("ts-arcade-server-url");
     if (saved) return cleanWsUrl(saved);
 
-    var host = location.hostname;
-    var isLocal = host === "localhost" || host === "127.0.0.1" || /^192\.168\./.test(host) || /^10\./.test(host) || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host);
-    if (isLocal) {
-      var protocol = location.protocol === "https:" ? "wss:" : "ws:";
-      return protocol + "//" + location.host + "/ws";
-    }
-    return "";
+    // 게임 서버가 직접 서빙하는 페이지(로컬·Render·터널)는 같은 주소의 /ws로 연결한다.
+    // 정적 호스팅(GitHub Pages)과 file://은 서버가 없으므로 [서버 설정] 주소가 필요하다.
+    if (location.protocol !== "http:" && location.protocol !== "https:") return "";
+    if (/\.github\.io$/i.test(location.hostname)) return "";
+    return (location.protocol === "https:" ? "wss:" : "ws:") + "//" + location.host + "/ws";
   }
 
   function updateServerModalInfo(isOnline, text) {
@@ -151,13 +149,16 @@
     if (urlText) urlText.textContent = wsUrl || "로컬/오프라인 전용";
   }
 
+  var p2pFallback = false;
+  function hasExplicitServer() { return !!(new URLSearchParams(location.search).get("server") || localStorage.getItem("ts-arcade-server-url")); }
   function connect() {
     clearTimeout(reconnectTimer);
-    var wsUrl = getWsServerUrl();
+    var wsUrl = p2pFallback ? "" : getWsServerUrl();
     if (!wsUrl) {
-      connectionLabel.textContent = "SOLO PLAY";
-      connectionLabel.style.color = "#ffd700";
-      updateServerModalInfo(false, "미설정 (1인 오프라인 모드)");
+      // 서버 주소가 없으면 P2P 모드: 방을 만들거나 입장할 때 브라우저끼리 직접 연결한다.
+      connectionLabel.textContent = "P2P READY";
+      connectionLabel.style.color = "#7dfcff";
+      updateServerModalInfo(false, "서버 없이 P2P로 연결합니다 (방장 브라우저가 서버 역할)");
       return;
     }
     connectionLabel.textContent = "CONNECTING";
@@ -170,9 +171,41 @@
       updateServerModalInfo(false, "연결 실패 (" + wsUrl + ")");
       return;
     }
+    attachSocket(socket, wsUrl);
+  }
+  function isP2PMode() { return p2pFallback || !getWsServerUrl(); }
+  function handleP2PClosed(closed) {
+    if (closed !== socket) return; // 이미 새 연결로 교체됐거나 직접 나간 경우
+    socket = null;
+    connectionLabel.textContent = "P2P READY"; connectionLabel.style.color = "#7dfcff";
+    if (room) {
+      showToast(room.hostId === room.selfId ? "연결이 끊겨 방이 닫혔습니다." : "방장과 연결이 끊겼습니다. 방이 종료되었습니다.", true);
+      room = null; lastActionId = -1; lastLeaderId = null; lastSelfHp = null;
+      history.replaceState(null, "", location.pathname); setScreen("home");
+    }
+  }
+  function closeSocketQuiet() {
+    var old = socket; socket = null;
+    if (old) { try { old.close(); } catch (_) {} }
+  }
+  function startP2P(role, code, onOpen) {
+    if (!window.TSP2P) { showToast("P2P 모듈을 불러오지 못했습니다. 새로고침 해주세요.", true); return; }
+    closeSocketQuiet();
+    connectionLabel.textContent = role === "host" ? "방 만드는 중" : "방 찾는 중";
+    connectionLabel.style.color = "";
+    var sock = role === "host" ? window.TSP2P.createHost() : window.TSP2P.createGuest(code);
+    socket = sock;
+    sock.addEventListener("open", function () { if (sock === socket) onOpen(sock); });
+    attachSocket(sock, "P2P");
+  }
+  function attachSocket(socket, wsUrl) {
+    var everOpened = false;
+    socket.addEventListener("error", function (event) { if (event && event.message) { showToast(event.message, true); tone("error"); } });
     socket.addEventListener("open", function () {
-      connectionLabel.textContent = "ONLINE CONNECT"; connectionLabel.style.color = "";
+      everOpened = true;
+      connectionLabel.textContent = socket.isP2P ? "P2P ONLINE" : "ONLINE CONNECT"; connectionLabel.style.color = "";
       updateServerModalInfo(true, wsUrl);
+      if (socket.isP2P) return;
       if (room) send("join-room", { roomCode: room.code, nickname: localStorage.getItem("ts-arcade-nickname") || "동네 게이머", token: sessionStorage.getItem(tokenKey(room.code)) });
       else if (requestedRoom && sessionStorage.getItem(tokenKey(requestedRoom))) send("join-room", { roomCode: requestedRoom, nickname: localStorage.getItem("ts-arcade-nickname") || "동네 게이머", token: sessionStorage.getItem(tokenKey(requestedRoom)) });
     });
@@ -215,10 +248,13 @@
         if (oldStatus === "lobby" && room.status === "game") tone("success");
         return;
       }
-      if (data.type === "left-room") { room = null; requestedRoom = null; lastActionId = -1; lastLeaderId = null; lastSelfHp = null; history.replaceState(null, "", location.pathname); setScreen("home"); return; }
+      if (data.type === "left-room") { room = null; requestedRoom = null; lastActionId = -1; lastLeaderId = null; lastSelfHp = null; history.replaceState(null, "", location.pathname); setScreen("home"); if (socket && socket.isP2P) { closeSocketQuiet(); connect(); } return; }
       if (data.type === "error") { showToast(data.message, true); tone("error"); }
     });
     socket.addEventListener("close", function () {
+      if (socket.isP2P) return handleP2PClosed(socket);
+      // 같은 주소에 게임 서버가 없으면(정적 호스팅) 서버 없이 P2P로 전환한다.
+      if (!everOpened && !hasExplicitServer() && !intentionalClose) { p2pFallback = true; return connect(); }
       connectionLabel.textContent = "RECONNECT"; connectionLabel.style.color = "#ff8f8a";
       updateServerModalInfo(false, "재연결 대기 중 (" + wsUrl + ")");
       if (!intentionalClose) reconnectTimer = setTimeout(connect, 3000);
@@ -228,6 +264,7 @@
     var value = nicknameInput.value.trim() || "동네 게이머"; nicknameInput.value = value; localStorage.setItem("ts-arcade-nickname", value); return value;
   }
   function inviteUrl() {
+    if (isP2PMode()) return room && /^https?:$/.test(location.protocol) ? location.origin + location.pathname + "?room=" + encodeURIComponent(room.code) : "";
     var stored = localStorage.getItem("ts-arcade-lan-url");
     var base = stored && serverInfo.lanUrls.indexOf(stored) >= 0 ? stored : serverInfo.lanUrls[0];
     return base ? base.replace(/\/+$/, "") + "/?room=" + encodeURIComponent(room.code) : "";
@@ -388,7 +425,7 @@
       ? '<span class="lane-rank-badge rank-' + rank + '">' + (rankMedals[rank] || (rank + "위")) + '</span>'
       : '<span class="lane-rank-badge rank-solo">1P</span>';
 
-    return '<article class="dino-lane skin-border-' + player.skin + " " + (player.id === room.selfId ? "is-self" : "") + " " + (!player.alive ? "is-out" : "") + '" data-player-id="' + player.id + '" data-dodged="' + (player.dodged || 0) + '"><div class="lane-meta"><div class="lane-meta__top">' + rankBadge + '<b>' + escapeHtml(player.nickname) + (player.id === room.selfId ? " (나)" : "") + '</b></div><span class="lane-hearts" data-hp="' + player.hp + '">' + hearts(player.hp) + '</span><div class="lane-stats"><strong class="lane-dist">' + player.distance + 'm</strong><small class="lane-score">' + (player.score || 0) + 'P</small></div></div><div class="race-strip"><div class="city-silhouette"></div><div class="road-lines"></div>' + dinoAvatar(player.skin) + '<span class="runner-state state-' + player.action + '">' + (player.action === "jump" ? "JUMP!" : player.action === "duck" ? "DUCK!" : "") + '</span><div class="obstacles-layer">' + obsMarkup + '</div><span class="lane-status" style="' + (!player.connected || !player.alive ? "" : "display:none") + '">' + (!player.connected ? "재접속 중..." : !player.alive ? "GAME OVER" : "") + "</span></div></article>";
+    return '<article class="dino-lane skin-border-' + player.skin + " " + (player.id === room.selfId ? "is-self" : "") + " " + (!player.alive ? "is-out" : "") + '" data-player-id="' + player.id + '" data-dodged="' + (player.dodged || 0) + '"><div class="lane-meta"><div class="lane-meta__top">' + rankBadge + '<b>' + escapeHtml(player.nickname) + (player.id === room.selfId ? " (나)" : "") + '</b></div><span class="lane-hearts" data-hp="' + player.hp + '">' + hearts(player.hp) + '</span><div class="lane-stats"><strong class="lane-dist">' + player.distance + 'm</strong><small class="lane-score">' + (player.score || 0) + 'P</small></div></div><div class="race-strip"><div class="city-silhouette"></div><div class="road-lines"></div>' + dinoAvatar(player.skin) + '<span class="runner-state state-' + player.action + '">' + (player.action === "jump" ? "JUMP!" : player.action === "duck" ? "DUCK!" : "") + '</span><div class="obstacles-layer">' + obsMarkup + '</div><span class="lane-status" style="' + (player.connected === false || !player.alive ? "" : "display:none") + '">' + (player.connected === false ? "재접속 중..." : !player.alive ? "GAME OVER" : "") + "</span></div></article>";
   }
 
   function generateLocalObstacles(seed, stage, startDist, endDist, startIndex) {
@@ -429,6 +466,7 @@
   }
 
   function startLocalSoloDino() {
+    var soloModal = document.getElementById("serverModal"); if (soloModal) soloModal.setAttribute("hidden", "hidden");
     isLocalSolo = true;
     localSoloRound = Date.now();
     var pName = nickname() || "동네 게이머";
@@ -462,6 +500,7 @@
           id: "p1",
           nickname: pName,
           skin: mySkin,
+          connected: true,
           hp: 3,
           alive: true,
           score: 0,
@@ -583,9 +622,32 @@
         }
       }
 
+      if (isLocalSolo && room.game.players[0]) {
+
+        var sp = room.game.players[0];
+
+        if (sp.action === "jump" && sp.actionUntil && Date.now() >= sp.actionUntil) { sp.action = "run"; sp.actionUntil = 0; }
+
+        var sl = document.querySelector(".dino-lane[data-player-id=\"" + sp.id + "\"]");
+
+        if (sl) {
+
+          sl.classList.toggle("is-jumping", sp.action === "jump");
+
+          sl.classList.toggle("is-ducking", sp.action === "duck");
+
+          var rs = sl.querySelector(".runner-state");
+
+          if (rs) { rs.className = "runner-state state-" + sp.action; rs.textContent = sp.action === "jump" ? "JUMP!" : sp.action === "duck" ? "DUCK!" : ""; }
+
+        }
+
+      }
+
       var elapsed = Math.max(0, (now - dinoLastServerTime) / 1000);
       var currentDist = dinoServerDist;
-      if (room.game.status === "running") {
+      if (isLocalSolo) currentDist = room.game.distance;
+      else if (room.game.status === "running") {
         currentDist = Math.min(room.game.finishDistance, dinoServerDist + dinoCurrentSpeed * elapsed);
       }
       var distEl = document.getElementById("dinoDistValue");
@@ -903,7 +965,7 @@
       }
       var statusSpan = lane.querySelector(".lane-status");
       if (statusSpan) {
-        if (!pl.connected) { statusSpan.style.display = "grid"; statusSpan.textContent = "재접속 중..."; }
+        if (pl.connected === false) { statusSpan.style.display = "grid"; statusSpan.textContent = "재접속 중..."; }
         else if (!pl.alive) { statusSpan.style.display = "grid"; statusSpan.textContent = "GAME OVER"; }
         else { statusSpan.style.display = "none"; }
       }
@@ -950,6 +1012,10 @@
       connect();
     }
     else if (action === "create-room") {
+      if (isP2PMode()) {
+        var hostNickname = nickname(), hostGame = selectedGame;
+        return startP2P("host", null, function (sock) { send("create-room", { nickname: hostNickname, gameType: hostGame, roomCode: sock.hostCode }); });
+      }
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         showToast("온라인 서버 연결이 필요합니다. [서버 설정]을 확인하거나 [1인 연습]을 즐겨보세요!", true);
         var modal = document.getElementById("serverModal"); if (modal) modal.removeAttribute("hidden");
@@ -958,6 +1024,12 @@
       send("create-room", { nickname: nickname(), gameType: selectedGame });
     }
     else if (action === "join-room") {
+      if (isP2PMode()) {
+        var p2pCode = roomCodeInput.value.replace(/\D/g, "").slice(-4);
+        if (p2pCode.length !== 4) return showToast("4자리 방 코드를 입력해주세요.", true);
+        var guestNickname = nickname();
+        return startP2P("guest", p2pCode, function () { send("join-room", { roomCode: p2pCode, nickname: guestNickname, token: sessionStorage.getItem(tokenKey(p2pCode)) }); });
+      }
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         showToast("온라인 서버 연결이 필요합니다. [서버 설정]을 확인해주세요.", true);
         var modal = document.getElementById("serverModal"); if (modal) modal.removeAttribute("hidden");
