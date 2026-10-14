@@ -1,0 +1,10 @@
+{
+  "name": "ts-game-center",
+  "version": "0.2.0",
+  "private": true,
+  "description": "같은 Wi-Fi에서 즐기는 TS 게임센터 로컬 멀티플레이",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}
