@@ -145,4 +145,45 @@ test("전기(zap) 아이템을 획득하면 전방 장애물이 모두 파괴되
   assert.equal(game.lastAction.type, "zap-blast");
 });
 
+test("4인 다이노 경기에서 거리·점수·생존 여부에 따라 순위가 실시간 정렬된다", () => {
+  const fourRacers = [
+    { id: "p1", nickname: "선수1", dinoSkin: "pink", connected: true },
+    { id: "p2", nickname: "선수2", dinoSkin: "cyan", connected: true },
+    { id: "p3", nickname: "선수3", dinoSkin: "green", connected: true },
+    { id: "p4", nickname: "선수4", dinoSkin: "yellow", connected: true },
+  ];
+  const game = createDinoGame(fourRacers, { now: 1000, countdownMs: 0, seed: 10, finishDistance: 500 });
+  assert.equal(game.ranking.length, 4, "초기 순위 배열은 4명 모두 포함해야 함");
+
+  game.players[0].dodged = 1;
+  game.players[0].bonusScore = 100;
+  game.players[0].hp = 3;
+
+  game.players[1].dodged = 5;
+  game.players[1].bonusScore = 500;
+  game.players[1].hp = 3;
+
+  game.players[2].dodged = 3;
+  game.players[2].bonusScore = 250;
+  game.players[2].hp = 2;
+
+  game.players[3].distance = 30;
+  game.players[3].dodged = 0;
+  game.players[3].hp = 0;
+  game.players[3].alive = false;
+
+  game.lastTickAt = 1000;
+  advanceDinoGame(game, 1050);
+
+  assert.equal(game.ranking.length, 4);
+  assert.equal(game.ranking[0], "p2", "1위는 최고 거리/점수 p2");
+  assert.equal(game.ranking[1], "p3", "2위는 p3");
+  assert.equal(game.ranking[2], "p1", "3위는 p1");
+  assert.equal(game.ranking[3], "p4", "4위는 탈락한 p4");
+
+  const pub = publicDinoGame(game, 1050);
+  assert.deepEqual(pub.ranking, ["p2", "p3", "p1", "p4"], "공개 상태의 ranking도 일치해야 함");
+});
+
+
 

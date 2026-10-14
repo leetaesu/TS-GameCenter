@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070811">
+  <meta name="description" content="같은 Wi-Fi에서 친구들과 즐기는 TS 게임센터">
+  <title>TS 게임센터</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="crt" aria-hidden="true"></div>
+  <header class="topbar">
+    <button class="brand" type="button" data-action="go-home" aria-label="TS 게임센터 홈">
+      <span class="brand__lamp"></span><span><strong>TS 게임센터</strong><small>NEIGHBORHOOD ARCADE</small></span>
+    </button>
+    <nav class="nav" aria-label="주 메뉴"><button class="nav__item is-active" type="button" data-action="go-home">오락실 로비</button><button class="nav__item" type="button" disabled>고전 명작</button><button class="nav__item" type="button" disabled>명예의 전당</button></nav>
+    <div class="status-cluster"><span class="network-pill" data-action="open-server-modal" title="클릭하여 온라인 서버 상태 확인"><i></i><span>SERVER<br><b id="connectionLabel">연결 중</b></span></span><button class="server-config-button" type="button" data-action="open-server-modal" title="온라인 서버 연결 설정">🌐 온라인 서버</button><span class="credit-pill">● CREDIT 99</span><button class="sound-button" type="button" data-action="toggle-sound" aria-pressed="true">♫ <span>ON</span></button></div>
+  </header>
+
+  <main>
+    <section class="screen is-active" data-screen="home" aria-labelledby="homeTitle">
+      <div class="location-bar"><span>태수동네 1호점</span><b>[ 서울 어딘가 골목길 ]</b><span>COIN: 100원</span></div>
+      <section class="marquee"><div class="marquee__title"><span>★</span><span class="pixel-alien">▟▙</span><h1 id="homeTitle">TS 게임센터</h1><span class="pixel-alien">▟▙</span><span>★</span></div><p>16-BIT RETRO LOCAL MULTIPLAYER SYSTEM</p><button type="button" data-action="focus-create" data-game="bell">▼ PRESS START ▼</button></section>
+      <figure class="storefront"><img src="./assets/arcade-storefront.png" alt="네온 간판이 빛나는 TS 게임센터 입구"><figcaption><small>STREET ARCADE ARCHIVE</small><strong>골목길 오락실 캐비닛 라인업</strong><span>동네 대전 준비 완료</span></figcaption></figure>
+
+      <section class="cabinet-grid" aria-label="게임 선택">
+        <article class="cabinet cabinet--active cabinet--bell">
+          <div class="cabinet__marquee"><small>2P~4P · HOT</small><h2>과일폭풍 종치기</h2><span>FRUIT BELL BATTLE</span></div>
+          <div class="cabinet__screen"><div class="mini-score"><b>1P: 840 PTS</b><b>BELL SPEED: 0.18s</b></div><div class="mini-cards"><span>🍓 ×3</span><button type="button" tabindex="-1">🔔</button><span>🍌 ×2</span></div><p>같은 과일 합계 5개!<br>친구보다 빠르게 종을 누르세요.</p></div>
+          <div class="cabinet__meta"><span>최대 4인 대전</span><span>온라인 실시간 멀티</span><span>실시간 반응속도</span></div>
+          <button class="arcade-button" type="button" data-action="focus-create" data-game="bell">게임 시작 <small>[INSERT COIN]</small></button>
+        </article>
+
+        <article class="cabinet cabinet--active cabinet--dino">
+          <div class="cabinet__marquee"><small>NEW GAME · 1P~4P</small><h2>네온 다이노 런</h2><span>NEON DINO RUN '94</span></div>
+          <div class="cabinet__screen dino-preview"><div class="dino-preview__moon"></div><div class="dino-preview__city"></div><div class="dino-preview__runner skin-pink">▟</div><div class="dino-preview__runner skin-cyan">▟</div><div class="dino-preview__runner skin-yellow">▟</div><div class="dino-preview__runner skin-violet">▟</div><span class="preview-crown">♛</span><span class="preview-drone">◆</span><p>점프하고 숙여서<br>마지막까지 살아남으세요!</p></div>
+          <div class="cabinet__meta"><span>1P~4P 레이스</span><span>오프라인 솔로 가능</span><span>점프 / 숙이기</span></div>
+          <button class="arcade-button" type="button" data-action="start-solo-dino">1인 즉시 플레이 <small>[FREE PLAY]</small></button>
+          <button class="arcade-button arcade-button--multi" type="button" data-action="focus-create" data-game="dino">온라인 방 만들기 <small>[MULTIPLAYER]</small></button>
+        </article>
+
+        <article class="cabinet is-locked"><div class="cabinet__marquee"><small>SCORE ATTACK</small><h2>네온 벽돌깨기</h2><span>NEON BREAKER DX</span></div><div class="cabinet__screen coming"><b>▤</b><strong>[ 다음 업데이트 ]</strong><p>최고점을 향해 네온 벽을 깨세요</p></div><button disabled>기기 조정 중</button></article>
+        <article class="cabinet is-locked"><div class="cabinet__marquee"><small>4P TRIVIA</small><h2>동네 퀴즈 배틀</h2><span>NEIGHBORHOOD QUIZ '94</span></div><div class="cabinet__screen coming"><b>?</b><strong>[ 1990s 상식 대전 ]</strong><p>버저를 먼저 누르고 답을 맞히세요</p></div><button disabled>준비 중인 기계입니다</button></article>
+      </section>
+
+      <section class="entry-panel" id="quickStart" aria-labelledby="quickStartTitle">
+        <div><span class="entry-panel__icon" id="entryIcon">🔔</span><h2 id="quickStartTitle">과일폭풍 종치기 방 만들기</h2><p id="quickStartDescription">방을 만들고 초대 주소나 4자리 방 코드로 친구를 초대하세요.</p></div>
+        <label>닉네임<input id="nicknameInput" maxlength="12" autocomplete="nickname" placeholder="동네 게이머"></label>
+        <button class="button button--pink" type="button" data-action="create-room">온라인 방 만들기</button>
+        <div class="join-box"><label>방 코드<input id="roomCodeInput" inputmode="numeric" maxlength="7" placeholder="예: 7721"></label><button class="button button--cyan" type="button" data-action="join-room">빠른 입장</button></div>
+        <button class="button button--yellow solo-start-btn" type="button" data-action="start-solo-dino">🦖 1인 연습 바로 달리기 (서버 없이 즉시 시작)</button>
+      </section>
+    </section>
+
+    <section class="screen" data-screen="lobby" aria-labelledby="lobbyTitle"><div id="lobbyContent"></div></section>
+    <section class="screen" data-screen="game" aria-labelledby="gameTitle"><div id="gameContent"></div></section>
+
+    <div class="server-modal" id="serverModal" role="dialog" aria-modal="true" aria-labelledby="serverModalTitle" style="display:none">
+      <div class="server-modal__box">
+        <button class="modal-close" type="button" data-action="close-server-modal" aria-label="닫기">✕</button>
+        <span class="server-modal__tag">ONLINE MULTIPLAYER</span>
+        <h2 id="serverModalTitle">🌐 온라인 게임 서버 연결</h2>
+        <p>전 세계 친구들과 온라인으로 함께 플레이하려면 WebSocket 게임 서버 주소가 필요합니다.</p>
+        <div class="server-status-card">
+          <span class="server-status-indicator" id="modalServerIndicator">●</span>
+          <div>
+            <b id="modalServerStatusText">서버 연결 확인 중...</b>
+            <small id="modalServerUrlText">로컬 연결</small>
+          </div>
+        </div>
+        <label class="server-input-label">
+          게임 서버 주소 (WSS 또는 도메인)
+          <input id="customServerInput" placeholder="예: wss://ts-gamecenter.onrender.com/ws" autocomplete="off">
+        </label>
+        <div class="server-modal__actions">
+          <button class="button button--pink" type="button" data-action="connect-custom-server">이 서버로 연결</button>
+          <button class="button button--ghost" type="button" data-action="reset-default-server">기본값 복원</button>
+        </div>
+        <div class="server-modal__guide">
+          <strong>💡 무료 클라우드 서버 호스팅 방법 (100% 무료)</strong>
+          <ol>
+            <li>Render.com 무료 가입 후 [New Web Service] 클릭</li>
+            <li>GitHub 저장소 leetaesu/TS-GameCenter 연결 및 배포</li>
+            <li>발급된 wss:// 주소를 위 입력창에 등록하면 온라인 대전 가능!</li>
+          </ol>
+          <button class="button button--yellow" type="button" data-action="start-solo-dino" style="width:100%;margin-top:10px">서버 없이 1인 플레이 바로 시작하기</button>
+        </div>
+      </div>
+    </div>
+  </main>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <footer class="footer"><div class="ticker"><span>● LIVE STATUS</span><span>전 세계 어디서든 친구들과 실시간 대전</span><span>★ TS 게임센터 네온 ON</span><span>ONLINE MULTIPLAYER</span></div><div><strong>TS 게임센터 (1994)</strong><p>골목길 가로등 아래, 동전 튕기는 소리가 가득한 레트로 오락실</p><small>© TS ARCADE. ONLINE &amp; LOCAL PLAY.</small></div></footer>
+  <script src="./js/qr.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>

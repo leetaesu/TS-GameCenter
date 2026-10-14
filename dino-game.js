@@ -92,6 +92,28 @@ function createDinoGame(players, options = {}) {
   const stageGoals = isCustomFinish ? [options.finishDistance] : STAGE_CHECKPOINTS;
   const finishDistance = options.finishDistance ?? (stageGoals[maxStage - 1] || 2400);
   const stageGoal = stageGoals[Math.min(stageGoals.length - 1, stage - 1)];
+  const playersList = players.map((player, index) => ({
+    id: player.id,
+    nickname: player.nickname,
+    skin: player.dinoSkin || SKINS[index % SKINS.length],
+    connected: player.connected,
+    hp: 3,
+    alive: true,
+    action: "run",
+    actionStartedAt: 0,
+    actionUntil: 0,
+    actionHistory: [],
+    lastInputSequence: -1,
+    distance: 0,
+    score: 0,
+    dodged: 0,
+    combo: 0,
+    maxCombo: 0,
+    bonusScore: 0,
+    hits: 0,
+    lastObstacleIndex: -1,
+    finishedAt: null,
+  }));
   return {
     kind: "dino",
     roundId: String(options.roundId || seed + "-" + now),
@@ -109,31 +131,10 @@ function createDinoGame(players, options = {}) {
     finishDistance,
     obstacles: createObstacles(seed, stageGoal),
     winnerId: null,
-    ranking: [],
+    ranking: playersList.map((p) => p.id),
     actionId: 0,
     lastAction: { type: "started", message: players.length === 1 ? "네온 다이노 연습이 곧 시작됩니다!" : "네온 다이노 레이스가 곧 시작됩니다!" },
-    players: players.map((player, index) => ({
-      id: player.id,
-      nickname: player.nickname,
-      skin: player.dinoSkin || SKINS[index % SKINS.length],
-      connected: player.connected,
-      hp: 3,
-      alive: true,
-      action: "run",
-      actionStartedAt: 0,
-      actionUntil: 0,
-      actionHistory: [],
-      lastInputSequence: -1,
-      distance: 0,
-      score: 0,
-      dodged: 0,
-      combo: 0,
-      maxCombo: 0,
-      bonusScore: 0,
-      hits: 0,
-      lastObstacleIndex: -1,
-      finishedAt: null,
-    })),
+    players: playersList,
   };
 }
 

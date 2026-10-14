@@ -72,6 +72,29 @@
   }
   function sendDinoInput(type, payload) {
     if (!room || !room.game) return false;
+    if (isLocalSolo) {
+      var pl = room.game.players[0];
+      if (!pl || !pl.alive || room.game.status !== "running") return false;
+      var now = Date.now();
+      if (type === "dino-jump") {
+        if (pl.action === "jump" && now < pl.actionUntil) return true;
+        pl.action = "jump";
+        pl.actionUntil = now + 480;
+        tone("jump");
+        renderDinoGame();
+      } else if (type === "dino-duck") {
+        if (pl.action === "jump" && now < pl.actionUntil) return true;
+        if (payload && payload.active) {
+          pl.action = "duck";
+          pl.actionUntil = now + 420;
+        } else {
+          pl.action = "run";
+          pl.actionUntil = 0;
+        }
+        renderDinoGame();
+      }
+      return true;
+    }
     dinoInputSequence += 1;
     return send(type, Object.assign({ sequence: dinoInputSequence, roundId: room.game.roundId }, payload || {}));
   }
@@ -79,20 +102,90 @@
     if (!room || !room.game) return false;
     return send(type, { roundId: room.game.roundId, tableRevision: room.game.tableRevision });
   }
+
+  var isLocalSolo = false;
+  var autoStartSolo = false;
+  var localSoloRound = 0;
+  var localLastTickTime = 0;
+
+  function cleanWsUrl(url) {
+    if (!url) return "";
+    var trimmed = url.trim();
+    if (trimmed.indexOf("http://") === 0) trimmed = "ws://" + trimmed.slice(7);
+    else if (trimmed.indexOf("https://") === 0) trimmed = "wss://" + trimmed.slice(8);
+    else if (trimmed.indexOf("ws://") !== 0 && trimmed.indexOf("wss://") !== 0) {
+      trimmed = (location.protocol === "https:" ? "wss://" : "ws://") + trimmed;
+    }
+    if (!/\/ws\/?$/.test(trimmed)) {
+      trimmed = trimmed.replace(/\/+$/, "") + "/ws";
+    }
+    return trimmed;
+  }
+
+  function getWsServerUrl() {
+    var urlParam = new URLSearchParams(location.search).get("server");
+    if (urlParam) {
+      var cleaned = cleanWsUrl(urlParam);
+      localStorage.setItem("ts-arcade-server-url", cleaned);
+      return cleaned;
+    }
+    var saved = localStorage.getItem("ts-arcade-server-url");
+    if (saved) return cleanWsUrl(saved);
+
+    var host = location.hostname;
+    var isLocal = host === "localhost" || host === "127.0.0.1" || /^192\.168\./.test(host) || /^10\./.test(host) || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host);
+    if (isLocal) {
+      var protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      return protocol + "//" + location.host + "/ws";
+    }
+    return "";
+  }
+
+  function updateServerModalInfo(isOnline, text) {
+    var indicator = document.getElementById("modalServerIndicator");
+    var statusText = document.getElementById("modalServerStatusText");
+    var urlText = document.getElementById("modalServerUrlText");
+    var wsUrl = getWsServerUrl();
+    if (indicator) indicator.className = "server-status-indicator" + (isOnline ? " is-online" : "");
+    if (statusText) statusText.textContent = isOnline ? "온라인 연결됨 (멀티플레이 가능)" : (text || "서버 미연결 (1인 오프라인 플레이 가능)");
+    if (urlText) urlText.textContent = wsUrl || "로컬/오프라인 전용";
+  }
+
   function connect() {
     clearTimeout(reconnectTimer);
-    var protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    socket = new WebSocket(protocol + "//" + location.host + "/ws"); connectionLabel.textContent = "CONNECTING";
+    var wsUrl = getWsServerUrl();
+    if (!wsUrl) {
+      connectionLabel.textContent = "SOLO PLAY";
+      connectionLabel.style.color = "#ffd700";
+      updateServerModalInfo(false, "미설정 (1인 오프라인 모드)");
+      return;
+    }
+    connectionLabel.textContent = "CONNECTING";
+    connectionLabel.style.color = "";
+    try {
+      socket = new WebSocket(wsUrl);
+    } catch (_) {
+      connectionLabel.textContent = "SOLO PLAY";
+      connectionLabel.style.color = "#ffd700";
+      updateServerModalInfo(false, "연결 실패 (" + wsUrl + ")");
+      return;
+    }
     socket.addEventListener("open", function () {
-      connectionLabel.textContent = "LOCAL CONNECT"; connectionLabel.style.color = "";
+      connectionLabel.textContent = "ONLINE CONNECT"; connectionLabel.style.color = "";
+      updateServerModalInfo(true, wsUrl);
       if (room) send("join-room", { roomCode: room.code, nickname: localStorage.getItem("ts-arcade-nickname") || "동네 게이머", token: sessionStorage.getItem(tokenKey(room.code)) });
       else if (requestedRoom && sessionStorage.getItem(tokenKey(requestedRoom))) send("join-room", { roomCode: requestedRoom, nickname: localStorage.getItem("ts-arcade-nickname") || "동네 게이머", token: sessionStorage.getItem(tokenKey(requestedRoom)) });
     });
     socket.addEventListener("message", function (event) {
       var data; try { data = JSON.parse(event.data); } catch (_) { return; }
-      if (data.type === "welcome") { sessionStorage.setItem(tokenKey(data.roomCode), data.token); history.replaceState(null, "", "/?room=" + encodeURIComponent(data.roomCode)); return; }
+      if (data.type === "welcome") { sessionStorage.setItem(tokenKey(data.roomCode), data.token); history.replaceState(null, "", location.pathname + "?room=" + encodeURIComponent(data.roomCode)); return; }
       if (data.type === "room-state") {
         var oldStatus = room && room.status; room = data.room; selectedGame = room.gameType;
+        if (autoStartSolo && room && room.status === "lobby" && room.players.length === 1 && room.hostId === room.selfId) {
+          autoStartSolo = false;
+          send("start-game");
+          return;
+        }
         if (room.gameType === "dino" && room.game) {
           var ownRacer = room.game.players.find(function (player) { return player.id === room.selfId; });
           var currentLeader = room.game.players.slice().sort(function (a, b) { return b.score - a.score || b.hp - a.hp; })[0];
@@ -122,10 +215,14 @@
         if (oldStatus === "lobby" && room.status === "game") tone("success");
         return;
       }
-      if (data.type === "left-room") { room = null; requestedRoom = null; lastActionId = -1; lastLeaderId = null; lastSelfHp = null; history.replaceState(null, "", "/"); setScreen("home"); return; }
+      if (data.type === "left-room") { room = null; requestedRoom = null; lastActionId = -1; lastLeaderId = null; lastSelfHp = null; history.replaceState(null, "", location.pathname); setScreen("home"); return; }
       if (data.type === "error") { showToast(data.message, true); tone("error"); }
     });
-    socket.addEventListener("close", function () { connectionLabel.textContent = "RECONNECT"; connectionLabel.style.color = "#ff8f8a"; if (!intentionalClose) reconnectTimer = setTimeout(connect, 1200); });
+    socket.addEventListener("close", function () {
+      connectionLabel.textContent = "RECONNECT"; connectionLabel.style.color = "#ff8f8a";
+      updateServerModalInfo(false, "재연결 대기 중 (" + wsUrl + ")");
+      if (!intentionalClose) reconnectTimer = setTimeout(connect, 3000);
+    });
   }
   function nickname() {
     var value = nicknameInput.value.trim() || "동네 게이머"; nicknameInput.value = value; localStorage.setItem("ts-arcade-nickname", value); return value;
@@ -284,7 +381,102 @@
 
   function dinoLane(player, index, game) {
     var obsMarkup = game.obstacles.map(obstacleElement).join("");
-    return '<article class="dino-lane skin-border-' + player.skin + " " + (player.id === room.selfId ? "is-self" : "") + " " + (!player.alive ? "is-out" : "") + '" data-player-id="' + player.id + '" data-dodged="' + (player.dodged || 0) + '"><div class="lane-meta"><b>' + (index + 1) + "P " + escapeHtml(player.nickname) + '</b><span class="lane-hearts" data-hp="' + player.hp + '">' + hearts(player.hp) + '</span><strong class="lane-dist">' + player.distance + 'm</strong></div><div class="race-strip"><div class="city-silhouette"></div><div class="road-lines"></div>' + dinoAvatar(player.skin) + '<span class="runner-state state-' + player.action + '">' + (player.action === "jump" ? "JUMP!" : player.action === "duck" ? "DUCK!" : "") + '</span><div class="obstacles-layer">' + obsMarkup + '</div><span class="lane-status" style="' + (!player.connected || !player.alive ? "" : "display:none") + '">' + (!player.connected ? "재접속 중..." : !player.alive ? "GAME OVER" : "") + "</span></div></article>";
+    var rankIdx = (game.ranking || []).indexOf(player.id);
+    var rank = rankIdx >= 0 ? rankIdx + 1 : (index + 1);
+    var rankMedals = { 1: "🥇 1위", 2: "🥈 2위", 3: "🥉 3위", 4: "4위" };
+    var rankBadge = game.players.length > 1
+      ? '<span class="lane-rank-badge rank-' + rank + '">' + (rankMedals[rank] || (rank + "위")) + '</span>'
+      : '<span class="lane-rank-badge rank-solo">1P</span>';
+
+    return '<article class="dino-lane skin-border-' + player.skin + " " + (player.id === room.selfId ? "is-self" : "") + " " + (!player.alive ? "is-out" : "") + '" data-player-id="' + player.id + '" data-dodged="' + (player.dodged || 0) + '"><div class="lane-meta"><div class="lane-meta__top">' + rankBadge + '<b>' + escapeHtml(player.nickname) + (player.id === room.selfId ? " (나)" : "") + '</b></div><span class="lane-hearts" data-hp="' + player.hp + '">' + hearts(player.hp) + '</span><div class="lane-stats"><strong class="lane-dist">' + player.distance + 'm</strong><small class="lane-score">' + (player.score || 0) + 'P</small></div></div><div class="race-strip"><div class="city-silhouette"></div><div class="road-lines"></div>' + dinoAvatar(player.skin) + '<span class="runner-state state-' + player.action + '">' + (player.action === "jump" ? "JUMP!" : player.action === "duck" ? "DUCK!" : "") + '</span><div class="obstacles-layer">' + obsMarkup + '</div><span class="lane-status" style="' + (!player.connected || !player.alive ? "" : "display:none") + '">' + (!player.connected ? "재접속 중..." : !player.alive ? "GAME OVER" : "") + "</span></div></article>";
+  }
+
+  function generateLocalObstacles(seed, stage, startDist, endDist, startIndex) {
+    startIndex = startIndex || 0;
+    var obstacles = [];
+    var dist = startDist + 38;
+    var index = startIndex;
+    var lastZapDist = startDist;
+    var groundKinds = ["cabinet", "cone", "cable", "spikes", "barrel"];
+    var airKinds = ["drone", "sign", "laser"];
+    var s = (Number(seed) + stage * 7919) >>> 0;
+    function rand() {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    }
+    while (dist < endDist - 25) {
+      if (dist - lastZapDist >= 90 && rand() < 0.35) {
+        obstacles.push({ id: "obs-" + index, distance: Math.round(dist), type: "item", kind: "zap" });
+        lastZapDist = dist;
+        dist += 34 + Math.round(rand() * 24);
+        index += 1;
+        continue;
+      }
+      var isGround = rand() > (0.38 + stage * 0.04);
+      var type = isGround ? "ground" : "air";
+      var kinds = isGround ? groundKinds : airKinds;
+      obstacles.push({
+        id: "obs-" + index,
+        distance: Math.round(dist),
+        type: type,
+        kind: kinds[Math.floor(rand() * kinds.length)],
+        stage: stage
+      });
+      dist += Math.max(30, 42 - stage * 2) + Math.round(rand() * 26);
+      index += 1;
+    }
+    return obstacles;
+  }
+
+  function startLocalSoloDino() {
+    isLocalSolo = true;
+    localSoloRound = Date.now();
+    var pName = nickname() || "동네 게이머";
+    var mySkin = localStorage.getItem("ts-arcade-skin") || "pink";
+    var seed = Math.floor(Math.random() * 999999);
+    var stageGoals = [500, 1000, 1500, 2000, 2500];
+    room = {
+      code: "SOLO",
+      status: "game",
+      gameType: "dino",
+      selfId: "p1",
+      hostId: "p1",
+      players: [{ id: "p1", nickname: pName, dinoSkin: mySkin, ready: true, connected: true, host: true }],
+      game: {
+        status: "countdown",
+        countdown: 3,
+        startedAt: Date.now() + 3000,
+        seed: seed,
+        stage: 1,
+        maxStage: 5,
+        stageGoal: 500,
+        stageGoals: stageGoals,
+        finishDistance: 2500,
+        distance: 0,
+        speed: 1,
+        obstacles: generateLocalObstacles(seed, 1, 0, 500),
+        ranking: ["p1"],
+        roundId: "solo-" + localSoloRound,
+        lastAction: { type: "started", message: "1인 오프라인 연습 레이스 준비!" },
+        players: [{
+          id: "p1",
+          nickname: pName,
+          skin: mySkin,
+          hp: 3,
+          alive: true,
+          score: 0,
+          distance: 0,
+          dodged: 0,
+          combo: 0,
+          maxCombo: 0,
+          action: "run",
+          actionUntil: 0,
+          lastObsIndex: -1
+        }]
+      }
+    };
+    renderDinoGame();
+    showToast("1인 연습 레이스 시작!");
   }
 
   function startDinoLoop() {
@@ -295,6 +487,100 @@
         return;
       }
       var now = performance.now();
+
+      if (isLocalSolo && room && room.game) {
+        var g = room.game;
+        var pl = g.players[0];
+        if (g.status === "countdown") {
+          if (Date.now() >= g.startedAt) {
+            g.status = "running";
+            g.startedAt = Date.now();
+            dinoLastServerTime = performance.now();
+            dinoServerDist = 0;
+            localLastTickTime = performance.now();
+            tone("success");
+            renderDinoGame();
+          }
+        } else if (g.status === "running" && pl.alive) {
+          var nowMs = Date.now();
+          var dt = Math.max(0, (now - (localLastTickTime || now)) / 1000);
+          localLastTickTime = now;
+          var spd = 26 + (g.stage - 1) * 3.5 + Math.min(22, g.distance / 38);
+          dinoCurrentSpeed = spd;
+          g.speed = Number((spd / 26).toFixed(1));
+          g.distance = Math.min(g.finishDistance, g.distance + spd * dt);
+          dinoServerDist = g.distance;
+          pl.distance = Math.round(g.distance);
+
+          if (pl.actionUntil && nowMs >= pl.actionUntil) {
+            pl.action = "run";
+            pl.actionUntil = 0;
+          }
+
+          var needRender = false;
+          for (var oi = (pl.lastObsIndex || -1) + 1; oi < g.obstacles.length; oi += 1) {
+            var ob = g.obstacles[oi];
+            if (ob.distance > g.distance) break;
+            pl.lastObsIndex = oi;
+            if (ob.destroyed) continue;
+
+            if (ob.kind === "zap") {
+              ob.destroyed = true;
+              pl.dodged += 1;
+              pl.combo = (pl.combo || 0) + 2;
+              if (pl.combo > (pl.maxCombo || 0)) pl.maxCombo = pl.combo;
+              g.lastBlast = { id: Date.now(), playerId: pl.id, count: 0 };
+              for (var z = oi + 1; z < g.obstacles.length; z += 1) {
+                if (g.obstacles[z].distance <= ob.distance + 140) {
+                  g.obstacles[z].destroyed = true;
+                  g.lastBlast.count += 1;
+                }
+              }
+              needRender = true;
+              continue;
+            }
+
+            var avoided = (ob.type === "ground" && pl.action === "jump") || (ob.type === "air" && pl.action === "duck");
+            if (avoided) {
+              pl.dodged += 1;
+              pl.combo = (pl.combo || 0) + 1;
+              if (pl.combo > (pl.maxCombo || 0)) pl.maxCombo = pl.combo;
+              needRender = true;
+            } else {
+              pl.combo = 0;
+              pl.hp -= 1;
+              tone("hit");
+              needRender = true;
+              if (pl.hp <= 0) {
+                pl.hp = 0;
+                pl.alive = false;
+                g.status = "finished";
+                g.winnerId = null;
+              }
+            }
+          }
+
+          if (pl.alive && g.distance >= g.stageGoal) {
+            if (g.stage < g.maxStage) {
+              var prevGoal = g.stageGoal;
+              g.stage += 1;
+              g.stageGoal = g.stageGoals[g.stage - 1];
+              pl.hp = Math.min(3, pl.hp + 1);
+              var nextObs = generateLocalObstacles(g.seed, g.stage, prevGoal, g.stageGoal, g.obstacles.length);
+              g.obstacles.push.apply(g.obstacles, nextObs);
+              tone("success");
+            } else {
+              g.status = "finished";
+              g.winnerId = "p1";
+              tone("success");
+            }
+            needRender = true;
+          }
+          pl.score = Math.round(pl.distance * 10) + pl.dodged * 100;
+          if (needRender || g.status === "finished") renderDinoGame();
+        }
+      }
+
       var elapsed = Math.max(0, (now - dinoLastServerTime) / 1000);
       var currentDist = dinoServerDist;
       if (room.game.status === "running") {
@@ -360,6 +646,59 @@
     dinoAnimId = requestAnimationFrame(tick);
   }
 
+  function renderDinoResult(game, isHost) {
+    var failedPractice = !game.winnerId && game.players.length === 1;
+    var allCleared = game.stage >= game.maxStage && game.distance >= game.finishDistance;
+    var champion = game.players.find(function (p) { return p.id === game.winnerId; });
+    var resultTitle = allCleared ? "👑 ALL STAGES CLEAR!" : (champion ? "🏆 " + escapeHtml(champion.nickname) + " 우승!" : "연습 종료!");
+    var subTitle = allCleared ? "PERFECT ALL CLEAR!" : (champion ? "RACE FINISH!" : "TRY AGAIN!");
+
+    var rankingList = (game.ranking || []).map(function (id, index) {
+      var p = game.players.find(function (item) { return item.id === id; });
+      if (!p) return "";
+      var rankNum = index + 1;
+      var medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : "4️⃣";
+      var rankText = failedPractice ? "기록" : (rankNum + "위");
+      var isSelf = p.id === room.selfId;
+      var statusBadge = "";
+      if (allCleared || (p.alive && p.distance >= game.finishDistance)) {
+        statusBadge = '<span class="rank-status-tag is-clear">완주</span>';
+      } else if (p.alive) {
+        statusBadge = '<span class="rank-status-tag is-alive">생존</span>';
+      } else {
+        statusBadge = '<span class="rank-status-tag is-out">탈락</span>';
+      }
+
+      return '<li class="rank-' + rankNum + (isSelf ? " is-self-rank" : "") + '">' +
+        '<span class="rank-medal-icon">' + medal + '</span>' +
+        '<b class="rank-num">' + rankText + '</b>' +
+        dinoAvatar(p.skin, true) +
+        '<div class="rank-info">' +
+          '<strong>' + escapeHtml(p.nickname) + (isSelf ? ' <small class="rank-self-badge">(나)</small>' : '') + '</strong>' +
+          '<div class="rank-sub-stats">' +
+            '<span>STAGE ' + (game.stage || 1) + '</span> · ' +
+            '<span>' + p.distance + 'm</span> · ' +
+            '<span>회피 ' + (p.dodged || 0) + '회</span>' +
+            (p.combo > 1 ? ' · <span class="rank-combo">최대 ' + p.combo + '연속</span>' : '') +
+          '</div>' +
+        '</div>' +
+        statusBadge +
+        '<span class="rank-score-val">' + (p.score || 0) + 'P</span>' +
+      '</li>';
+    }).join("");
+
+    return '<div class="dino-result" role="dialog" aria-modal="true" aria-labelledby="raceResultTitle">' +
+      '<div>' +
+        '<small>' + subTitle + '</small>' +
+        '<div class="winner-celebration">' + (champion ? dinoAvatar(champion.skin) : "") + '</div>' +
+        '<h2 id="raceResultTitle">' + resultTitle + '</h2>' +
+        '<ol class="dino-ranking-list">' + rankingList + '</ol>' +
+        (isHost ? '<button class="button button--pink" type="button" data-action="dino-rematch">' + (champion ? "다시 달리기" : "다시 도전") + '</button><button class="button button--cyan" type="button" data-action="return-lobby">대기실로 돌아가기</button>' : '<button class="button button--ghost" disabled>방장을 기다리는 중</button>') +
+        '<button class="button button--ghost" type="button" data-action="leave-room">TS 게임센터로 나가기</button>' +
+      '</div>' +
+    '</div>';
+  }
+
   function renderDinoGame() {
     setScreen("game"); var game = room.game; if (!game) return;
     var isHost = room.selfId === room.hostId; var self = game.players.find(function (p) { return p.id === room.selfId; });
@@ -409,6 +748,11 @@
       }
     }
 
+    var rankMedals = { 1: "🥇 1위", 2: "🥈 2위", 3: "🥉 3위", 4: "4위" };
+    var selfRankIdx = (game.ranking || []).indexOf(room.selfId);
+    var selfRank = selfRankIdx >= 0 ? selfRankIdx + 1 : 1;
+    var myRankBadge = '<span class="dino-my-rank" id="dinoMyRank" style="display:' + (game.players.length > 1 ? "inline-flex" : "none") + '">내 순위 <b id="dinoMyRankVal" class="rank-' + selfRank + '">' + (rankMedals[selfRank] || (selfRank + "위")) + '</b><small>/' + game.players.length + 'P</small></span>';
+
     var existingArena = document.querySelector(".dino-arena");
     var stageThemeClass = "stage-theme-" + Math.min(5, game.stage || 1);
     if (!existingArena || dinoMountedRound !== game.roundId) {
@@ -416,18 +760,10 @@
       var ordered = game.players.slice().sort(function (a, b) { if (a.id === room.selfId) return -1; if (b.id === room.selfId) return 1; return 0; });
       var lanes = ordered.map(function (player, index) { return dinoLane(player, game.players.indexOf(player), game); }).join("");
       var countdown = game.status === "countdown" ? '<div class="race-countdown"><b class="count-pop" data-sec="' + game.countdown + '">' + game.countdown + "</b><span>GET READY</span></div>" : "";
-      var result = "";
-      if (game.status === "finished") {
-        var failedPractice = !game.winnerId && game.players.length === 1;
-        var allCleared = game.stage >= game.maxStage && game.distance >= game.finishDistance;
-        var ranking = game.ranking.map(function (id, index) { var p = game.players.find(function (item) { return item.id === id; }); return '<li class="rank-' + (index + 1) + '"><b>' + (failedPractice ? "기록" : (index + 1) + "위") + "</b>" + dinoAvatar(p.skin, true) + "<span><strong>" + escapeHtml(p.nickname) + "</strong><small>STAGE " + (game.stage || 1) + " · 거리 " + p.distance + "m · 회피 " + p.dodged + "회</small></span></li>"; }).join("");
-        var champion = game.players.find(function (p) { return p.id === game.winnerId; });
-        var resultTitle = allCleared ? "👑 ALL STAGES CLEAR!" : (champion ? "🏆 " + escapeHtml(champion.nickname) + " 우승!" : "연습 종료!");
-        result = '<div class="dino-result" role="dialog" aria-modal="true" aria-labelledby="raceResultTitle"><div><small>' + (allCleared ? "PERFECT ALL CLEAR!" : (champion ? "RACE FINISH!" : "TRY AGAIN!")) + '</small><div class="winner-celebration">' + (champion ? dinoAvatar(champion.skin) : "") + '</div><h2 id="raceResultTitle">' + resultTitle + '</h2><ol>' + ranking + "</ol>" + (isHost ? '<button class="button button--pink" type="button" data-action="dino-rematch">' + (champion ? "다시 달리기" : "다시 도전") + '</button><button class="button button--cyan" type="button" data-action="return-lobby">대기실로 돌아가기</button>' : '<button class="button button--ghost" disabled>방장을 기다리는 중</button>') + '<button class="button button--ghost" type="button" data-action="leave-room">TS 게임센터로 나가기</button></div></div>';
-      }
+      var result = game.status === "finished" ? renderDinoResult(game, isHost) : "";
       var selfCombo = self ? (self.combo || 0) : 0;
       var comboDisplay = selfCombo > 1 ? "inline-flex" : "none";
-      document.getElementById("gameContent").innerHTML = '<div class="game-toolbar dino-toolbar"><button class="back-button" type="button" data-action="leave-room">← TS 게임센터</button><div class="game-toolbar__meta"><span>ROOM <b>#TS-' + escapeHtml(room.code) + '</b></span><span id="dinoSpeedMeta">SPEED <b>×' + game.speed + '</b></span><span>DIST <b id="dinoDistValue">' + game.distance + 'm</b> / <small id="dinoGoalValue">' + (game.stageGoal || game.finishDistance) + 'm</small></span></div><span class="game-toolbar__sync" id="dinoSyncMeta">● SYNC ' + latency + 'ms</span></div><section class="dino-arena ' + stageThemeClass + '" aria-labelledby="gameTitle"><h1 id="gameTitle" class="sr-only">네온 다이노 런 레이스</h1><div class="dino-hud"><span class="dino-stage-pill">STAGE <b id="dinoStageMeta">' + (game.stage || 1) + '</b> / ' + (game.maxStage || 5) + '</span><span class="dino-combo-badge" id="dinoComboBadge" style="display:' + comboDisplay + '">🔥 <b id="dinoComboValue">' + selfCombo + '</b> COMBO</span><b id="dinoLeaderMeta">LEADER ♛ ' + escapeHtml(leader ? leader.nickname : "-") + '</b><span id="dinoGoalMeta">STAGE GOAL ' + (game.stageGoal || game.finishDistance) + 'm</span></div><div class="dino-lanes">' + lanes + "</div><div id=\"dinoCountdownBox\">" + countdown + '</div><div class="dino-controls"><button class="dino-control jump-control ' + (midair ? "is-active" : "") + '" type="button" data-action="dino-jump" aria-label="점프" ' + (controlsLocked || midair ? "disabled" : "") + '><span aria-hidden="true">▲</span><b>JUMP</b><small>점프 · SPACE / ↑</small></button><button class="dino-control duck-control ' + (isDucking ? "is-active" : "") + '" type="button" data-action="dino-duck" aria-label="누르고 있는 동안 숙이기" aria-pressed="' + String(Boolean(isDucking)) + '" ' + (controlsLocked || midair ? "disabled" : "") + '><span aria-hidden="true">▼</span><b>DUCK</b><small>누르고 있기 · ↓</small></button></div><div class="race-log" role="status" aria-live="polite"><span id="dinoLogText">' + escapeHtml(game.lastAction ? game.lastAction.message : "레이스 준비") + "</span><b>SERVER AUTHORITATIVE</b></div><div id=\"dinoResultBox\">" + result + "</div></section>";
+      document.getElementById("gameContent").innerHTML = '<div class="game-toolbar dino-toolbar"><button class="back-button" type="button" data-action="leave-room">← TS 게임센터</button><div class="game-toolbar__meta"><span>ROOM <b>#TS-' + escapeHtml(room.code) + '</b></span><span id="dinoSpeedMeta">SPEED <b>×' + game.speed + '</b></span><span>DIST <b id="dinoDistValue">' + game.distance + 'm</b> / <small id="dinoGoalValue">' + (game.stageGoal || game.finishDistance) + 'm</small></span></div><span class="game-toolbar__sync" id="dinoSyncMeta">● SYNC ' + latency + 'ms</span></div><section class="dino-arena ' + stageThemeClass + '" aria-labelledby="gameTitle"><h1 id="gameTitle" class="sr-only">네온 다이노 런 레이스</h1><div class="dino-hud"><span class="dino-stage-pill">STAGE <b id="dinoStageMeta">' + (game.stage || 1) + '</b> / ' + (game.maxStage || 5) + '</span><span class="dino-combo-badge" id="dinoComboBadge" style="display:' + comboDisplay + '">🔥 <b id="dinoComboValue">' + selfCombo + '</b> COMBO</span>' + myRankBadge + '<b id="dinoLeaderMeta">LEADER ♛ ' + escapeHtml(leader ? leader.nickname : "-") + '</b><span id="dinoGoalMeta">STAGE GOAL ' + (game.stageGoal || game.finishDistance) + 'm</span></div><div class="dino-lanes">' + lanes + "</div><div id=\"dinoCountdownBox\">" + countdown + '</div><div class="dino-controls"><button class="dino-control jump-control ' + (midair ? "is-active" : "") + '" type="button" data-action="dino-jump" aria-label="점프" ' + (controlsLocked || midair ? "disabled" : "") + '><span aria-hidden="true">▲</span><b>JUMP</b><small>점프 · SPACE / ↑</small></button><button class="dino-control duck-control ' + (isDucking ? "is-active" : "") + '" type="button" data-action="dino-duck" aria-label="누르고 있는 동안 숙이기" aria-pressed="' + String(Boolean(isDucking)) + '" ' + (controlsLocked || midair ? "disabled" : "") + '><span aria-hidden="true">▼</span><b>DUCK</b><small>누르고 있기 · ↓</small></button></div><div class="race-log" role="status" aria-live="polite"><span id="dinoLogText">' + escapeHtml(game.lastAction ? game.lastAction.message : "레이스 준비") + "</span><b>SERVER AUTHORITATIVE</b></div><div id=\"dinoResultBox\">" + result + "</div></section>";
       startDinoLoop();
       return;
     }
@@ -440,6 +776,18 @@
     var stageEl = document.getElementById("dinoStageMeta"); if (stageEl) stageEl.textContent = game.stage || 1;
     var goalEl = document.getElementById("dinoGoalMeta"); if (goalEl) goalEl.textContent = "STAGE GOAL " + (game.stageGoal || game.finishDistance) + "m";
     var goalVal = document.getElementById("dinoGoalValue"); if (goalVal) goalVal.textContent = (game.stageGoal || game.finishDistance) + "m";
+
+    var myRankEl = document.getElementById("dinoMyRank");
+    var myRankVal = document.getElementById("dinoMyRankVal");
+    if (myRankEl && myRankVal) {
+      if (game.players.length > 1) {
+        myRankEl.style.display = "inline-flex";
+        myRankVal.className = "rank-" + selfRank;
+        myRankVal.textContent = rankMedals[selfRank] || (selfRank + "위");
+      } else {
+        myRankEl.style.display = "none";
+      }
+    }
 
     var comboBadge = document.getElementById("dinoComboBadge");
     var comboVal = document.getElementById("dinoComboValue");
@@ -467,12 +815,7 @@
     if (resultBox) {
       if (game.status === "finished") {
         if (!resultBox.firstElementChild) {
-          var failedPractice = !game.winnerId && game.players.length === 1;
-          var allCleared = game.stage >= game.maxStage && game.distance >= game.finishDistance;
-          var ranking = game.ranking.map(function (id, index) { var p = game.players.find(function (item) { return item.id === id; }); return '<li class="rank-' + (index + 1) + '"><b>' + (failedPractice ? "기록" : (index + 1) + "위") + "</b>" + dinoAvatar(p.skin, true) + "<span><strong>" + escapeHtml(p.nickname) + "</strong><small>STAGE " + (game.stage || 1) + " · 거리 " + p.distance + "m · 회피 " + p.dodged + "회</small></span></li>"; }).join("");
-          var champion = game.players.find(function (p) { return p.id === game.winnerId; });
-          var resultTitle = allCleared ? "👑 ALL STAGES CLEAR!" : (champion ? "🏆 " + escapeHtml(champion.nickname) + " 우승!" : "연습 종료!");
-          resultBox.innerHTML = '<div class="dino-result" role="dialog" aria-modal="true" aria-labelledby="raceResultTitle"><div><small>' + (allCleared ? "PERFECT ALL CLEAR!" : (champion ? "RACE FINISH!" : "TRY AGAIN!")) + '</small><div class="winner-celebration">' + (champion ? dinoAvatar(champion.skin) : "") + '</div><h2 id="raceResultTitle">' + resultTitle + '</h2><ol>' + ranking + "</ol>" + (isHost ? '<button class="button button--pink" type="button" data-action="dino-rematch">' + (champion ? "다시 달리기" : "다시 도전") + '</button><button class="button button--cyan" type="button" data-action="return-lobby">대기실로 돌아가기</button>' : '<button class="button button--ghost" disabled>방장을 기다리는 중</button>') + '<button class="button button--ghost" type="button" data-action="leave-room">TS 게임센터로 나가기</button></div></div>';
+          resultBox.innerHTML = renderDinoResult(game, isHost);
         }
       } else {
         resultBox.innerHTML = "";
@@ -539,6 +882,15 @@
       lane.setAttribute("data-dodged", pl.dodged);
       var distText = lane.querySelector(".lane-dist");
       if (distText) distText.textContent = pl.distance + "m";
+      var scoreText = lane.querySelector(".lane-score");
+      if (scoreText) scoreText.textContent = (pl.score || 0) + "P";
+      var rankBadgeEl = lane.querySelector(".lane-rank-badge");
+      if (rankBadgeEl && game.players.length > 1) {
+        var rIdx = (game.ranking || []).indexOf(pl.id);
+        var pRank = rIdx >= 0 ? rIdx + 1 : (p + 1);
+        rankBadgeEl.className = "lane-rank-badge rank-" + pRank;
+        rankBadgeEl.textContent = rankMedals[pRank] || (pRank + "위");
+      }
       lane.classList.toggle("is-out", !pl.alive);
       lane.classList.toggle("is-jumping", pl.action === "jump");
       lane.classList.toggle("is-ducking", pl.action === "duck");
@@ -572,13 +924,57 @@
     if (!duckHeld) sendDinoInput("dino-duck", { active: false });
   }
   document.addEventListener("click", function (event) {
+    if (event.target.id === "serverModal") { document.getElementById("serverModal").setAttribute("hidden", "hidden"); return; }
     var button = event.target.closest("[data-action]"); if (!button || button.disabled) return; var action = button.getAttribute("data-action");
     if (["ring-bell", "flip-card", "dino-jump", "dino-duck"].indexOf(action) < 0) tone("click");
     if (action === "focus-create") { selectGame(button.getAttribute("data-game")); document.getElementById("quickStart").scrollIntoView({ behavior: "smooth", block: "center" }); nicknameInput.focus(); }
-    else if (action === "create-room") send("create-room", { nickname: nickname(), gameType: selectedGame });
-    else if (action === "join-room") { var code = roomCodeInput.value.replace(/\D/g, "").slice(-4); if (code.length !== 4) return showToast("4자리 방 코드를 입력해주세요.", true); send("join-room", { roomCode: code, nickname: nickname(), token: sessionStorage.getItem(tokenKey(code)) }); }
-    else if (action === "go-home") { document.body.classList.remove("game-locked"); document.documentElement.classList.remove("game-locked"); if (room) send("leave-room"); else setScreen("home"); }
-    else if (action === "leave-room") { document.body.classList.remove("game-locked"); document.documentElement.classList.remove("game-locked"); send("leave-room"); }
+    else if (action === "start-solo-dino") { startLocalSoloDino(); }
+    else if (action === "open-server-modal") { var modal = document.getElementById("serverModal"); if (modal) { modal.removeAttribute("hidden"); var inp = document.getElementById("customServerInput"); if (inp) inp.value = localStorage.getItem("ts-arcade-server-url") || ""; } }
+    else if (action === "close-server-modal") { var modal = document.getElementById("serverModal"); if (modal) modal.setAttribute("hidden", "hidden"); }
+    else if (action === "connect-custom-server") {
+      var inp = document.getElementById("customServerInput"); var val = inp ? inp.value.trim() : "";
+      if (!val) return showToast("서버 주소를 입력해주세요.", true);
+      var cleaned = cleanWsUrl(val); localStorage.setItem("ts-arcade-server-url", cleaned);
+      var modal = document.getElementById("serverModal"); if (modal) modal.setAttribute("hidden", "hidden");
+      showToast("새 서버로 연결 시도 중입니다...");
+      if (socket) { try { socket.close(); } catch (_) {} }
+      connect();
+    }
+    else if (action === "reset-default-server") {
+      localStorage.removeItem("ts-arcade-server-url");
+      var modal = document.getElementById("serverModal"); if (modal) modal.setAttribute("hidden", "hidden");
+      showToast("기본 서버 주소로 초기화했습니다.");
+      if (socket) { try { socket.close(); } catch (_) {} }
+      connect();
+    }
+    else if (action === "create-room") {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        showToast("온라인 서버 연결이 필요합니다. [서버 설정]을 확인하거나 [1인 연습]을 즐겨보세요!", true);
+        var modal = document.getElementById("serverModal"); if (modal) modal.removeAttribute("hidden");
+        return;
+      }
+      send("create-room", { nickname: nickname(), gameType: selectedGame });
+    }
+    else if (action === "join-room") {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        showToast("온라인 서버 연결이 필요합니다. [서버 설정]을 확인해주세요.", true);
+        var modal = document.getElementById("serverModal"); if (modal) modal.removeAttribute("hidden");
+        return;
+      }
+      var code = roomCodeInput.value.replace(/\D/g, "").slice(-4);
+      if (code.length !== 4) return showToast("4자리 방 코드를 입력해주세요.", true);
+      send("join-room", { roomCode: code, nickname: nickname(), token: sessionStorage.getItem(tokenKey(code)) });
+    }
+    else if (action === "go-home") {
+      document.body.classList.remove("game-locked"); document.documentElement.classList.remove("game-locked");
+      if (isLocalSolo) { isLocalSolo = false; stopDinoLoop(); room = null; setScreen("home"); }
+      else if (room) { send("leave-room"); } else { setScreen("home"); }
+    }
+    else if (action === "leave-room") {
+      document.body.classList.remove("game-locked"); document.documentElement.classList.remove("game-locked");
+      if (isLocalSolo) { isLocalSolo = false; stopDinoLoop(); room = null; setScreen("home"); }
+      else { send("leave-room"); }
+    }
     else if (action === "copy-link") copyText(inviteUrl(), "초대 주소를 복사했습니다.");
     else if (action === "copy-code") copyText(room.code, "방 코드를 복사했습니다.");
     else if (action === "toggle-ready") send("toggle-ready");
@@ -588,9 +984,12 @@
     else if (action === "flip-card") sendBellInput("flip-card");
     else if (action === "ring-bell") { tone("bell"); if (navigator.vibrate) navigator.vibrate(35); sendBellInput("ring-bell"); }
     else if (action === "dino-jump") { tone("jump"); if (navigator.vibrate) navigator.vibrate(18); sendDinoInput("dino-jump"); }
-    else if (action === "dino-rematch") send("dino-rematch");
+    else if (action === "dino-rematch") { if (isLocalSolo) startLocalSoloDino(); else send("dino-rematch"); }
     else if (action === "bell-rematch") send("bell-rematch");
-    else if (action === "return-lobby") send("return-lobby");
+    else if (action === "return-lobby") {
+      if (isLocalSolo) { isLocalSolo = false; stopDinoLoop(); room = null; setScreen("home"); }
+      else { send("return-lobby"); }
+    }
     else if (action === "toggle-sound") { soundOn = !soundOn; localStorage.setItem("ts-arcade-sound", soundOn ? "on" : "off"); updateSoundButton(); if (soundOn) tone("success"); }
   });
   document.addEventListener("pointerdown", function (event) { var button = event.target.closest('[data-action="dino-duck"]'); if (!button || button.disabled || duckPointerId !== null) return; event.preventDefault(); duckPointerId = event.pointerId; sendDinoInput("dino-duck", { active: true }); });

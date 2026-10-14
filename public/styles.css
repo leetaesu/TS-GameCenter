@@ -107,11 +107,33 @@ main { min-height: calc(100vh - 180px); }
 .entry-panel input, .profile-edit input { width: 100%; height: 46px; padding: 0 13px; border: 1px solid #393649; border-radius: 4px; color: white; background: #08080e; box-shadow: inset 0 3px 8px #000; }
 .entry-panel input:focus, .profile-edit input:focus { border-color: var(--cyan); box-shadow: inset 0 3px 8px #000, 0 0 10px rgba(0,238,252,.25); }
 .join-box { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
-.button { min-height: 48px; padding: 0 20px; border: 0; border-radius: 4px; font-weight: 900; white-space: nowrap; }
+.button { min-height: 48px; padding: 0 20px; border: 0; border-radius: 4px; font-weight: 900; white-space: nowrap; cursor: pointer; }
 .button--pink { color: #370018; background: var(--pink); box-shadow: 0 5px 0 #7d0643, 0 0 16px rgba(255,71,156,.35); }
 .button--cyan { color: #002e31; background: var(--cyan); box-shadow: 0 5px 0 #006d75, 0 0 16px rgba(0,238,252,.25); }
+.button--yellow { color: #201700; background: var(--yellow); box-shadow: 0 5px 0 #8c7b00, 0 0 16px rgba(253,228,0,.35); }
 .button--ghost { color: var(--pink-soft); background: #252331; border: 1px solid #433d50; }
 .button:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
+.server-config-button { margin-left: 4px; padding: 3px 9px; border: 1px solid var(--cyan); border-radius: 4px; background: rgba(0,240,255,.14); color: var(--cyan); font: 800 11px Consolas,monospace; cursor: pointer; }
+.solo-start-btn { grid-column: 1 / -1; margin-top: 6px; font-size: 15px; }
+.arcade-button--multi { margin-top: 6px; min-height: 48px; font-size: 14px; background: linear-gradient(#24223b, #151322); border: 1px solid #4a4266; box-shadow: 0 4px 0 #0d0c15; }
+
+.server-modal { position: fixed; z-index: 150; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(4, 4, 10, 0.85); backdrop-filter: blur(8px); }
+.server-modal__box { position: relative; width: min(540px, 100%); max-height: 90vh; overflow-y: auto; padding: 26px; border: 2px solid var(--cyan); border-radius: 12px; background: linear-gradient(135deg, #1b1730, #0a0a13); box-shadow: 0 0 50px rgba(0, 240, 255, 0.25); }
+.modal-close { position: absolute; right: 14px; top: 14px; width: 34px; height: 34px; border: 1px solid #443c5e; border-radius: 6px; background: #12101e; color: #d0c4e0; font-weight: 900; cursor: pointer; }
+.server-modal__tag { color: var(--pink-soft); font: 900 11px Consolas, monospace; letter-spacing: .2em; display: block; margin-bottom: 4px; }
+.server-modal h2 { margin: 0 0 10px; color: var(--cyan); font-size: 22px; }
+.server-modal p { margin: 0 0 16px; color: #b7a9c8; font-size: 13px; line-height: 1.6; }
+.server-status-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 6px; background: rgba(0,0,0,.5); border: 1px solid #362e4f; margin-bottom: 16px; }
+.server-status-indicator { font-size: 22px; line-height: 1; color: #ff5277; }
+.server-status-indicator.is-online { color: #39ff14; text-shadow: 0 0 10px #39ff14; }
+.server-status-card b { display: block; color: white; font-size: 14px; }
+.server-status-card small { color: #9c8fb2; font: 700 11px Consolas, monospace; }
+.server-input-label { display: grid; gap: 6px; color: var(--cyan); font: 700 11px Consolas, monospace; margin-bottom: 14px; }
+.server-input-label input { width: 100%; height: 46px; padding: 0 12px; border: 1px solid #483d66; border-radius: 6px; background: #070710; color: white; font: 800 12px Consolas, monospace; }
+.server-modal__actions { display: flex; gap: 10px; margin-bottom: 18px; }
+.server-modal__guide { padding: 14px; border-radius: 6px; background: rgba(18, 16, 28, 0.7); border: 1px solid #2f2844; color: #cfc2df; font-size: 12px; line-height: 1.6; }
+.server-modal__guide ol { margin: 8px 0 10px 18px; padding: 0; }
+.server-modal__guide li { margin-bottom: 4px; }
 
 /* 대기실 */
 .room-toolbar { min-height: 58px; padding: 10px 18px; display: flex; align-items: center; justify-content: space-between; gap: 15px; border-radius: 8px; background: var(--panel); box-shadow: var(--shadow); }
@@ -317,10 +339,28 @@ body.game-locked .dino-arena { flex: 1; min-height: 0; height: 100%; max-height:
 .dino-combo-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; background: rgba(253,228,0,.15); border: 1px solid var(--yellow); color: var(--yellow); font: 900 11px Consolas,monospace; }
 .dino-combo-badge.is-fever { background: rgba(255,0,127,.25); border-color: #ff007f; color: #ff55a3; box-shadow: 0 0 12px rgba(255,0,127,.5); animation: fever-badge-pulse .3s ease-in-out infinite alternate; }
 @keyframes fever-badge-pulse { to { transform: scale(1.08); } }
+.dino-my-rank { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 4px; background: rgba(23,18,38,.85); border: 1px solid #4a3e6a; color: #c4b5d6; font: 800 11px Consolas,monospace; }
+.dino-my-rank b.rank-1 { color: var(--yellow); text-shadow: 0 0 8px rgba(253,228,0,.8); }
+.dino-my-rank b.rank-2 { color: var(--cyan); text-shadow: 0 0 8px rgba(0,240,255,.8); }
+.dino-my-rank b.rank-3 { color: #ffaa33; text-shadow: 0 0 8px rgba(255,145,0,.8); }
+.dino-my-rank b.rank-4 { color: #b5a8c8; }
+.dino-my-rank small { color: #8c7f9e; }
 .dino-lanes { display: grid; gap: 10px; margin-top: 10px; }
 .dino-lane { display: grid; grid-template-columns: 185px 1fr; min-height: 98px; overflow: hidden; border: 1px solid currentColor; border-radius: 7px; background: #090a13; box-shadow: 0 0 12px color-mix(in srgb,currentColor 25%,transparent); }
 .dino-lane.is-self { min-height: 124px; border-width: 3px; box-shadow: 0 0 24px color-mix(in srgb,currentColor 42%,transparent); order: -1; }.dino-lane.is-out { filter: grayscale(.8); opacity: .48; }
-.lane-meta { position: relative; z-index: 3; display: grid; align-content: center; gap: 6px; padding: 10px 14px; border-right: 1px solid currentColor; background: rgba(8,8,15,.92); }.lane-meta b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: white; }.lane-meta strong { color: currentColor; font: 900 18px Consolas,monospace; }.heart { color: #ff416f; text-shadow: 0 0 7px #ff416f; }.heart.is-empty { color: #382633; text-shadow: none; }
+.lane-meta { position: relative; z-index: 3; display: grid; align-content: center; gap: 6px; padding: 10px 14px; border-right: 1px solid currentColor; background: rgba(8,8,15,.92); }
+.lane-meta__top { display: flex; align-items: center; gap: 6px; overflow: hidden; }
+.lane-rank-badge { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 1px 6px; border-radius: 4px; font: 900 11px Consolas,monospace; letter-spacing: .04em; }
+.lane-rank-badge.rank-1 { background: rgba(253,228,0,.22); border: 1px solid var(--yellow); color: var(--yellow); text-shadow: 0 0 6px rgba(253,228,0,.6); }
+.lane-rank-badge.rank-2 { background: rgba(0,240,255,.2); border: 1px solid var(--cyan); color: var(--cyan); text-shadow: 0 0 6px rgba(0,240,255,.6); }
+.lane-rank-badge.rank-3 { background: rgba(255,145,0,.2); border: 1px solid #ff9100; color: #ffaa33; text-shadow: 0 0 6px rgba(255,145,0,.6); }
+.lane-rank-badge.rank-4 { background: rgba(160,140,180,.15); border: 1px solid #706584; color: #b5a8c8; }
+.lane-rank-badge.rank-solo { background: rgba(255,255,255,.1); border: 1px solid #555; color: #ccc; }
+.lane-meta b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: white; }
+.lane-stats { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.lane-meta strong { color: currentColor; font: 900 18px Consolas,monospace; }
+.lane-stats .lane-score { color: var(--yellow); font: 800 12px Consolas,monospace; text-shadow: 0 0 6px rgba(253,228,0,.4); }
+.heart { color: #ff416f; text-shadow: 0 0 7px #ff416f; }.heart.is-empty { color: #382633; text-shadow: none; }
 .race-strip { position: relative; min-width: 0; overflow: hidden; background: linear-gradient(#171742,#261550 55%,#090a11 56%); }
 .race-strip::after { content: ""; position: absolute; left: 0; right: 0; bottom: 23px; height: 3px; background: currentColor; opacity: .55; box-shadow: 0 0 8px currentColor; }
 .city-silhouette { position: absolute; inset: 18px 0 26px; opacity: .7; background: repeating-linear-gradient(90deg,#08091a 0 35px,#111134 35px 58px,#08091a 58px 73px); clip-path: polygon(0 30%,5% 30%,5% 3%,12% 3%,12% 45%,20% 45%,20% 14%,28% 14%,28% 52%,37% 52%,37% 0,44% 0,44% 35%,53% 35%,53% 10%,64% 10%,64% 44%,75% 44%,75% 4%,84% 4%,84% 30%,92% 30%,92% 16%,100% 16%,100% 100%,0 100%); }
@@ -425,7 +465,34 @@ body.game-locked .dino-arena { flex: 1; min-height: 0; height: 100%; max-height:
 .dino-controls { position: absolute; z-index: 20; left: 18px; right: 18px; bottom: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }.dino-control { min-height: 84px; display: grid; grid-template-columns: auto auto; grid-template-rows: 1fr 1fr; align-items: center; justify-content: center; column-gap: 12px; border: 3px solid currentColor; border-radius: 12px; background: linear-gradient(#24233b,#101019); box-shadow: 0 8px 0 #050508,0 0 22px color-mix(in srgb,currentColor 30%,transparent); user-select: none; touch-action: none; }.dino-control span { grid-row: 1/3; font-size: 36px; }.dino-control b { align-self: end; font: 900 22px Consolas,monospace; }.dino-control small { align-self: start; opacity: .8; }.dino-control:active { transform: translateY(7px); box-shadow: 0 1px 0 #050508,0 0 30px currentColor; }.jump-control { color: var(--cyan); }.duck-control { color: var(--pink); }.dino-control:disabled { opacity: .25; }
 .dino-control.is-active { background: linear-gradient(#3d375a,#191625); box-shadow: 0 2px 0 #050508,0 0 34px currentColor; transform: translateY(6px); }
 .race-log { position: absolute; left: 24px; right: 24px; bottom: 10px; display: flex; justify-content: space-between; color: #a998b0; font: 800 9px Consolas,monospace; }.race-log b { color: var(--cyan); }
-.dino-result { position: absolute; z-index: 40; inset: 0; display: grid; place-items: center; padding: 15px; background: rgba(3,3,9,.88); backdrop-filter: blur(8px); }.dino-result > div { width: min(580px,100%); padding: 28px; border: 2px solid var(--yellow); border-radius: 12px; background: linear-gradient(#211632,#0e0d16); box-shadow: 0 0 55px rgba(253,228,0,.25); text-align: center; }.dino-result > div > small { color: var(--cyan); font: 900 12px Consolas,monospace; letter-spacing: .22em; }.dino-result h2 { margin: 8px 0 18px; color: var(--yellow); font-size: 30px; }.dino-result ol { display: grid; gap: 7px; margin: 0 0 18px; padding: 0; list-style: none; }.dino-result li { min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 8px 13px; border: 1px solid #393345; background: #0d0c14; text-align: left; }.dino-result li > b { color: var(--pink-soft); }.dino-result li > span { display: grid; }.dino-result li small { color: #a493a1; }.dino-result .rank-1 { border-color: var(--yellow); box-shadow: 0 0 14px rgba(253,228,0,.17); }.dino-result .button { margin: 5px; }
+.dino-result { position: absolute; z-index: 40; inset: 0; display: grid; place-items: center; padding: 15px; background: rgba(3,3,9,.88); backdrop-filter: blur(8px); }
+.dino-result > div { width: min(620px,100%); padding: 26px; border: 2px solid var(--yellow); border-radius: 12px; background: linear-gradient(#211632,#0e0d16); box-shadow: 0 0 55px rgba(253,228,0,.25); text-align: center; }
+.dino-result > div > small { color: var(--cyan); font: 900 12px Consolas,monospace; letter-spacing: .22em; }
+.dino-result h2 { margin: 8px 0 16px; color: var(--yellow); font-size: 28px; }
+.dino-ranking-list { display: grid; gap: 8px; margin: 0 0 18px; padding: 0; list-style: none; }
+.dino-ranking-list li { min-height: 54px; display: grid; grid-template-columns: 28px 46px 40px 1fr auto auto; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid #393345; border-radius: 8px; background: #0c0b14; text-align: left; }
+.dino-ranking-list .rank-1 { border-color: var(--yellow); background: linear-gradient(90deg, rgba(253,228,0,.14), #0f0d1a); box-shadow: 0 0 20px rgba(253,228,0,.22); }
+.dino-ranking-list .rank-2 { border-color: var(--cyan); background: linear-gradient(90deg, rgba(0,240,255,.12), #0f0d1a); box-shadow: 0 0 16px rgba(0,240,255,.18); }
+.dino-ranking-list .rank-3 { border-color: #ff9100; background: linear-gradient(90deg, rgba(255,145,0,.12), #0f0d1a); box-shadow: 0 0 14px rgba(255,145,0,.15); }
+.dino-ranking-list .rank-4 { border-color: #4a425a; background: #0c0b14; }
+.dino-ranking-list li.is-self-rank { border-width: 2px; outline: 1px solid var(--cyan); }
+.rank-medal-icon { font-size: 20px; line-height: 1; text-align: center; }
+.rank-num { font: 900 14px Consolas,monospace; color: #d8cde6; }
+.rank-1 .rank-num { color: var(--yellow); }
+.rank-2 .rank-num { color: var(--cyan); }
+.rank-3 .rank-num { color: #ffaa33; }
+.rank-4 .rank-num { color: #a493a1; }
+.rank-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rank-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: white; font-size: 14px; }
+.rank-self-badge { color: var(--yellow); font-weight: 800; font-size: 11px; margin-left: 4px; }
+.rank-sub-stats { color: #8e809c; font: 700 11px Consolas,monospace; }
+.rank-sub-stats .rank-combo { color: #ff55a3; }
+.rank-status-tag { display: inline-flex; align-items: center; justify-content: center; padding: 2px 7px; border-radius: 4px; font: 900 11px Consolas,monospace; }
+.rank-status-tag.is-clear { background: rgba(57,255,20,.2); border: 1px solid var(--green); color: var(--green); text-shadow: 0 0 8px var(--green); }
+.rank-status-tag.is-alive { background: rgba(0,240,255,.16); border: 1px solid var(--cyan); color: var(--cyan); }
+.rank-status-tag.is-out { background: rgba(255,23,68,.18); border: 1px solid #ff1744; color: #ff5277; }
+.rank-score-val { font: 900 16px Consolas,monospace; color: var(--yellow); text-shadow: 0 0 8px rgba(253,228,0,.4); margin-left: 6px; }
+.dino-result .button { margin: 5px; }
 .winner-celebration { min-height: 68px; display: grid; place-items: center; }.winner-celebration .pixel-dino { animation: winner-hop .65s ease-in-out infinite alternate; }
 .dino-hit-flash::after { content: ""; position: fixed; z-index: 145; inset: 0; pointer-events: none; background: rgba(255,32,56,.24); animation: hit-flash .18s ease-out; }
 @keyframes dino-run { 50% { translate: 0 -3px; } }
@@ -442,6 +509,13 @@ body.game-locked .dino-arena { flex: 1; min-height: 0; height: 100%; max-height:
   .runner-state { display: none; }.race-countdown { inset: 35px 7px 146px; }.race-countdown b { font-size: 80px; }.race-countdown.is-go b { font-size: 88px; }
   .stage-clear-banner { padding: 12px 20px; width: 90%; }.stage-clear-banner b { font-size: 20px; }.stage-clear-banner span { font-size: 11px; }
   .dino-controls { position: fixed; z-index: 90; left: 10px; right: 10px; bottom: max(10px,env(safe-area-inset-bottom)); gap: 9px; padding: 0; }.dino-control { min-height: 86px; border-width: 2px; }.dino-control span { font-size: 27px; }.dino-control b { font-size: 17px; }.dino-control small { font-size: 9px; }.race-log { display: none; }.dino-result { position: fixed; z-index: 120; }.dino-result > div { max-height: 92dvh; overflow: auto; padding: 20px 12px; }
+  .dino-ranking-list li { grid-template-columns: 22px 38px 34px 1fr auto; gap: 6px; padding: 7px 9px; }
+  .rank-info strong { font-size: 13px; }
+  .rank-sub-stats { font-size: 9px; }
+  .rank-score-val { font-size: 13px; margin-left: 2px; }
+  .lane-stats .lane-score { font-size: 10px; }
+  .lane-rank-badge { font-size: 9px; padding: 1px 4px; }
+  .dino-my-rank { font-size: 9px; padding: 1px 6px; }
 }
 
 @supports not (color: color-mix(in srgb, red, blue)) {

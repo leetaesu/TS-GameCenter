@@ -13,9 +13,9 @@ const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
 test("게임 화면 자산은 로컬 파일만 사용한다", () => {
   assert.doesNotMatch(html, /https?:\/\//i);
   assert.doesNotMatch(html, /cdn/i);
-  assert.match(html, /src="\/js\/qr\.js"/);
-  assert.match(html, /src="\/js\/app\.js"/);
-  assert.match(html, /href="\/styles\.css"/);
+  assert.match(html, /src="(?:\.)?\/js\/qr\.js"/);
+  assert.match(html, /src="(?:\.)?\/js\/app\.js"/);
+  assert.match(html, /href="(?:\.)?\/styles\.css"/);
 });
 
 test("종치기 모바일·키보드·접근성 계약이 화면 코드에 있다", () => {
